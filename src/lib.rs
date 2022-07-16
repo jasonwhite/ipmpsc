@@ -199,7 +199,21 @@ impl SharedRingBuffer {
 
         Ok(Self(View::try_new(Arc::new(UnsafeCell::new(buffer)))?))
     }
+
+    #[cfg(unix)]
+    pub unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Result<Self> {
+        let map = MmapMut::map_mut(fd)?;
+
+        let buffer = Buffer::try_new("", map, None)?;
+
+        if buffer.header().flags.load(Relaxed) != crate::flags() {
+            return Err(Error::IncompatibleRingBuffer);
+        }
+
+        Ok(Self(View::try_new(Arc::new(UnsafeCell::new(buffer)))?))
+    }
 }
+
 
 /// Represents the receiving end of an inter-process channel, capable of receiving any message type implementing
 /// [`serde::Deserialize`](https://docs.serde.rs/serde/trait.Deserialize.html).
